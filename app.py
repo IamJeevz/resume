@@ -11,9 +11,14 @@ app = Flask(__name__)
 UPLOAD_FOLDER = '/mnt/data/uploads'  # Render's persistent storage path
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
-# Check if the path is accessible
-print("Checking if the upload folder exists...")
-print("Uploads folder exists: ", os.path.exists(UPLOAD_FOLDER))
+# Check if the path exists, and create if it doesn't
+if not os.path.exists(UPLOAD_FOLDER):
+    try:
+        os.makedirs(UPLOAD_FOLDER)
+        print(f"Created upload folder at {UPLOAD_FOLDER}")
+    except PermissionError as e:
+        print(f"PermissionError while creating folder: {e}")
+        raise e
 
 # Function to extract email
 def extract_email(text):
@@ -92,35 +97,27 @@ def index():
         # Get the uploaded file
         uploaded_files = request.files.getlist('file')
 
-        # Create a temporary directory inside the uploads folder to store the files
-        temp_folder = os.path.join(app.config['UPLOAD_FOLDER'], 'temp')
-
-        # Ensure the directory exists
-        try:
-            if not os.path.exists(temp_folder):
-                os.makedirs(temp_folder)
-        except PermissionError as e:
-            return f"PermissionError: {e} - Please check your permissions."
+        # Ensure the upload folder exists
+        if not os.path.exists(app.config['UPLOAD_FOLDER']):
+            try:
+                os.makedirs(app.config['UPLOAD_FOLDER'])
+            except PermissionError as e:
+                return f"PermissionError: {e} - Please check your permissions."
 
         # Process resumes and extract data
         resume_data = []
         
         for file in uploaded_files:
-            # Save the uploaded files in the temporary directory
-            file_path = os.path.join(temp_folder, file.filename)
+            # Save the uploaded files in the upload folder
+            file_path = os.path.join(app.config['UPLOAD_FOLDER'], file.filename)
             file.save(file_path)
             
             # Process the files to extract data
-            resume_data.extend(process_resumes(temp_folder))
+            resume_data.extend(process_resumes(app.config['UPLOAD_FOLDER']))
 
         # Create the Excel file
         output_file = os.path.join(app.config['UPLOAD_FOLDER'], 'resume_data.xlsx')
         create_excel(resume_data, output_file)
-
-        # Clean up the temporary folder
-        for file in os.listdir(temp_folder):
-            os.remove(os.path.join(temp_folder, file))
-        os.rmdir(temp_folder)
 
         # Send the generated Excel file to the user
         return send_file(output_file, as_attachment=True)
