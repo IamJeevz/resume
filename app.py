@@ -1,4 +1,5 @@
 import os
+import tempfile
 from flask import Flask, request, render_template, send_file
 import pdfplumber
 import docx
@@ -7,17 +8,9 @@ import openpyxl
 
 app = Flask(__name__)
 
-# Define the path to store uploaded files (under Render's persistent storage directory)
-UPLOAD_FOLDER = '/mnt/data/uploads'  # Using the subdirectory under /mnt/data for uploads
+# Use tempfile to handle temporary directory creation
+UPLOAD_FOLDER = tempfile.mkdtemp()  # Creates a temporary directory in a safe location
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
-
-# Check if the folder exists, if not, create it
-if not os.path.exists(UPLOAD_FOLDER):
-    try:
-        os.makedirs(UPLOAD_FOLDER)
-    except PermissionError as e:
-        print(f"PermissionError while creating folder: {e}")
-        raise e
 
 # Function to extract email
 def extract_email(text):
@@ -95,13 +88,6 @@ def index():
     if request.method == 'POST':
         # Get the uploaded file
         uploaded_files = request.files.getlist('file')
-
-        # Ensure the upload folder exists
-        if not os.path.exists(app.config['UPLOAD_FOLDER']):
-            try:
-                os.makedirs(app.config['UPLOAD_FOLDER'])
-            except PermissionError as e:
-                return f"PermissionError: {e} - Please check your permissions."
 
         # Process resumes and extract data
         resume_data = []
