@@ -4,16 +4,12 @@ import pdfplumber
 import docx
 import re
 import openpyxl
-import tempfile
 
 app = Flask(__name__)
 
 # Set up the path for storing uploaded files (using Render's persistent disk)
 UPLOAD_FOLDER = '/mnt/data/uploads'  # Render's persistent storage path
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
-
-# Ensure the upload folder exists
-os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 # Function to extract email
 def extract_email(text):
@@ -94,15 +90,17 @@ def index():
         
         # Create a temporary directory to store the uploaded files
         temp_folder = os.path.join(app.config['UPLOAD_FOLDER'], 'temp')
-        os.makedirs(temp_folder, exist_ok=True)
 
+        # Process resumes and extract data
+        resume_data = []
+        
         for file in uploaded_files:
             # Save the uploaded files in the temporary directory
             file_path = os.path.join(temp_folder, file.filename)
             file.save(file_path)
-
-        # Process resumes and extract data
-        resume_data = process_resumes(temp_folder)
+            
+            # Process the files to extract data
+            resume_data.extend(process_resumes(temp_folder))
 
         # Create the Excel file
         output_file = os.path.join(app.config['UPLOAD_FOLDER'], 'resume_data.xlsx')
