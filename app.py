@@ -90,6 +90,10 @@ def index():
         
         # Create a temporary directory to store the uploaded files
         temp_folder = os.path.join(app.config['UPLOAD_FOLDER'], 'temp')
+        
+        # Ensure the directory exists
+        if not os.path.exists(temp_folder):
+            os.makedirs(temp_folder)
 
         # Process resumes and extract data
         resume_data = []
