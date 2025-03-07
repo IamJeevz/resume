@@ -87,13 +87,16 @@ def index():
     if request.method == 'POST':
         # Get the uploaded file
         uploaded_files = request.files.getlist('file')
-        
-        # Create a temporary directory to store the uploaded files
+
+        # Create a temporary directory inside the uploads folder to store the files
         temp_folder = os.path.join(app.config['UPLOAD_FOLDER'], 'temp')
-        
+
         # Ensure the directory exists
         if not os.path.exists(temp_folder):
-            os.makedirs(temp_folder)
+            try:
+                os.makedirs(temp_folder)
+            except PermissionError as e:
+                return f"PermissionError: {e} - Please check your permissions."
 
         # Process resumes and extract data
         resume_data = []
