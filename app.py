@@ -5,6 +5,7 @@ import pdfplumber
 import docx
 import re
 import openpyxl
+from datetime import datetime
 
 app = Flask(__name__)
 
@@ -100,8 +101,13 @@ def index():
             resume_data = process_resume(file_path)
             all_resume_data.extend(resume_data)
 
+        # Get current datetime for dynamic file naming
+        current_datetime = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        
+        # Create dynamic output file name with the current datetime
+        output_file = os.path.join(app.config['UPLOAD_FOLDER'], f'resumedata_{current_datetime}.xlsx')
+
         # Create the Excel file with extracted data
-        output_file = os.path.join(app.config['UPLOAD_FOLDER'], 'resume_data.xlsx')
         create_excel(all_resume_data, output_file)
 
         # Send the generated Excel file to the user
