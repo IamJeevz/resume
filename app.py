@@ -7,15 +7,14 @@ import openpyxl
 
 app = Flask(__name__)
 
-# Set up the path for storing uploaded files (using Render's persistent disk)
-UPLOAD_FOLDER = '/mnt/data/uploads'  # Render's persistent storage path
+# Define the path to store uploaded files (under Render's persistent storage directory)
+UPLOAD_FOLDER = '/mnt/data/uploads'  # Using the subdirectory under /mnt/data for uploads
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
-# Check if the path exists, and create if it doesn't
+# Check if the folder exists, if not, create it
 if not os.path.exists(UPLOAD_FOLDER):
     try:
         os.makedirs(UPLOAD_FOLDER)
-        print(f"Created upload folder at {UPLOAD_FOLDER}")
     except PermissionError as e:
         print(f"PermissionError while creating folder: {e}")
         raise e
