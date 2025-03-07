@@ -1,16 +1,19 @@
 import os
-import re
+from flask import Flask, request, render_template, send_file
 import pdfplumber
 import docx
+import re
 import openpyxl
-from flask import Flask, request, jsonify, send_file, render_template
-from werkzeug.utils import secure_filename
+import tempfile
 
 app = Flask(__name__)
 
-# Configure the file upload folder
-UPLOAD_FOLDER = 'uploads'
+# Set up the path for storing uploaded files (using Render's persistent disk)
+UPLOAD_FOLDER = '/mnt/data/uploads'  # Render's persistent storage path
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+
+# Ensure the upload folder exists
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 # Function to extract email
 def extract_email(text):
@@ -24,11 +27,11 @@ def extract_phone(text):
     phone = re.findall(phone_pattern, text)
     return phone[0] if phone else None
 
-# Function to extract name
+# Function to extract name (assuming the name is in the first line/paragraph)
 def extract_name(text):
     lines = text.splitlines()
     for line in lines:
-        if line.strip():  # Check if the line is not empty
+        if line.strip():
             return line.strip()
     return None
 
@@ -49,25 +52,33 @@ def read_docx(file_path):
     return text
 
 # Function to process resumes and extract data
-def process_resume(file_path):
-    if file_path.endswith('.pdf'):
-        text = read_pdf(file_path)
-    elif file_path.endswith('.docx'):
-        text = read_docx(file_path)
-    else:
-        return None
+def process_resumes(folder_path):
+    resume_data = []
+    for file_name in os.listdir(folder_path):
+        if file_name.endswith('.pdf'):
+            text = read_pdf(os.path.join(folder_path, file_name))
+        elif file_name.endswith('.docx'):
+            text = read_docx(os.path.join(folder_path, file_name))
+        else:
+            print(f"Unsupported file type: {file_name}")
+            continue
 
-    name = extract_name(text)
-    email = extract_email(text)
-    phone = extract_phone(text)
+        # Extract name, email, and phone number from the text
+        name = extract_name(text)
+        email = extract_email(text)
+        phone = extract_phone(text)
+        
+        # Store the extracted data
+        resume_data.append([name, email, phone])
 
-    return [name, email, phone]
+    return resume_data
 
 # Function to create and save data into an Excel file
 def create_excel(data, output_file):
     wb = openpyxl.Workbook()
     ws = wb.active
     ws.title = "Resume Data"
+
     headers = ["Name", "Email", "Phone Number"]
     ws.append(headers)
     for row in data:
@@ -75,40 +86,37 @@ def create_excel(data, output_file):
 
     wb.save(output_file)
 
-# Flask route to upload file(s) and process resume
-@app.route('/upload', methods=['POST'])
-def upload_file():
-    files = request.files.getlist('file')
-    
-    if not files:
-        return jsonify({"error": "No files selected"}), 400
-
-    resume_data = []
-
-    # Process each file
-    for file in files:
-        filename = secure_filename(file.filename)
-        file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-        file.save(file_path)
-        data = process_resume(file_path)
-        
-        if data:
-            resume_data.append(data)
-        else:
-            return jsonify({"error": f"Unable to process the file {filename}"}), 400
-
-    output_file = 'resume_data.xlsx'
-    create_excel(resume_data, output_file)
-    return send_file(output_file, as_attachment=True)
-
-# Flask route to serve the front-end page
-@app.route('/')
+@app.route('/', methods=['GET', 'POST'])
 def index():
+    if request.method == 'POST':
+        # Get the uploaded file
+        uploaded_files = request.files.getlist('file')
+        
+        # Create a temporary directory to store the uploaded files
+        temp_folder = os.path.join(app.config['UPLOAD_FOLDER'], 'temp')
+        os.makedirs(temp_folder, exist_ok=True)
+
+        for file in uploaded_files:
+            # Save the uploaded files in the temporary directory
+            file_path = os.path.join(temp_folder, file.filename)
+            file.save(file_path)
+
+        # Process resumes and extract data
+        resume_data = process_resumes(temp_folder)
+
+        # Create the Excel file
+        output_file = os.path.join(app.config['UPLOAD_FOLDER'], 'resume_data.xlsx')
+        create_excel(resume_data, output_file)
+
+        # Clean up the temporary folder
+        for file in os.listdir(temp_folder):
+            os.remove(os.path.join(temp_folder, file))
+        os.rmdir(temp_folder)
+
+        # Send the generated Excel file to the user
+        return send_file(output_file, as_attachment=True)
+
     return render_template('index.html')
 
 if __name__ == "__main__":
-    # Make sure to create an 'uploads' folder
-    if not os.path.exists(app.config['UPLOAD_FOLDER']):
-        os.makedirs(app.config['UPLOAD_FOLDER'])
-    
     app.run(debug=True)
