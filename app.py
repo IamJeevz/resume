@@ -48,27 +48,25 @@ def read_docx(file_path):
         text += para.text
     return text
 
-# Function to process resumes and extract data
-def process_resumes(folder_path):
-    resume_data = []
-    for file_name in os.listdir(folder_path):
-        if file_name.endswith('.pdf'):
-            text = read_pdf(os.path.join(folder_path, file_name))
-        elif file_name.endswith('.docx'):
-            text = read_docx(os.path.join(folder_path, file_name))
-        else:
-            print(f"Unsupported file type: {file_name}")
-            continue
+# Function to process a single resume and extract data
+def process_resume(file_path):
+    # Read the file and extract text
+    text = ''
+    if file_path.endswith('.pdf'):
+        text = read_pdf(file_path)
+    elif file_path.endswith('.docx'):
+        text = read_docx(file_path)
+    else:
+        print(f"Unsupported file type: {file_path}")
+        return []
 
-        # Extract name, email, and phone number from the text
-        name = extract_name(text)
-        email = extract_email(text)
-        phone = extract_phone(text)
-        
-        # Store the extracted data
-        resume_data.append([name, email, phone])
-
-    return resume_data
+    # Extract name, email, and phone number from the text
+    name = extract_name(text)
+    email = extract_email(text)
+    phone = extract_phone(text)
+    
+    # Return the extracted data
+    return [(name, email, phone)]
 
 # Function to create and save data into an Excel file
 def create_excel(data, output_file):
@@ -86,23 +84,25 @@ def create_excel(data, output_file):
 @app.route('/', methods=['GET', 'POST'])
 def index():
     if request.method == 'POST':
-        # Get the uploaded file
+        # Get the uploaded file(s)
         uploaded_files = request.files.getlist('file')
 
-        # Process resumes and extract data
-        resume_data = []
+        # Initialize list to hold all extracted resume data
+        all_resume_data = []
         
+        # Process each uploaded file individually
         for file in uploaded_files:
-            # Save the uploaded files in the upload folder
+            # Save the uploaded file in the temporary upload folder
             file_path = os.path.join(app.config['UPLOAD_FOLDER'], file.filename)
             file.save(file_path)
             
-            # Process the files to extract data
-            resume_data.extend(process_resumes(app.config['UPLOAD_FOLDER']))
+            # Process the file to extract data and add it to the overall data
+            resume_data = process_resume(file_path)
+            all_resume_data.extend(resume_data)
 
-        # Create the Excel file
+        # Create the Excel file with extracted data
         output_file = os.path.join(app.config['UPLOAD_FOLDER'], 'resume_data.xlsx')
-        create_excel(resume_data, output_file)
+        create_excel(all_resume_data, output_file)
 
         # Send the generated Excel file to the user
         return send_file(output_file, as_attachment=True)

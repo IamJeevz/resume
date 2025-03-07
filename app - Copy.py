@@ -1,4 +1,5 @@
 import os
+import tempfile
 from flask import Flask, request, render_template, send_file
 import pdfplumber
 import docx
@@ -7,8 +8,8 @@ import openpyxl
 
 app = Flask(__name__)
 
-# Set up the path for storing uploaded files (using Render's persistent disk)
-UPLOAD_FOLDER = '/mnt/data/uploads'  # Render's persistent storage path
+# Use tempfile to handle temporary directory creation
+UPLOAD_FOLDER = tempfile.mkdtemp()  # Creates a temporary directory in a safe location
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
 # Function to extract email
@@ -88,35 +89,20 @@ def index():
         # Get the uploaded file
         uploaded_files = request.files.getlist('file')
 
-        # Create a temporary directory inside the uploads folder to store the files
-        temp_folder = os.path.join(app.config['UPLOAD_FOLDER'], 'temp')
-
-        # Ensure the directory exists
-        if not os.path.exists(temp_folder):
-            try:
-                os.makedirs(temp_folder)
-            except PermissionError as e:
-                return f"PermissionError: {e} - Please check your permissions."
-
         # Process resumes and extract data
         resume_data = []
         
         for file in uploaded_files:
-            # Save the uploaded files in the temporary directory
-            file_path = os.path.join(temp_folder, file.filename)
+            # Save the uploaded files in the upload folder
+            file_path = os.path.join(app.config['UPLOAD_FOLDER'], file.filename)
             file.save(file_path)
             
             # Process the files to extract data
-            resume_data.extend(process_resumes(temp_folder))
+            resume_data.extend(process_resumes(app.config['UPLOAD_FOLDER']))
 
         # Create the Excel file
         output_file = os.path.join(app.config['UPLOAD_FOLDER'], 'resume_data.xlsx')
         create_excel(resume_data, output_file)
-
-        # Clean up the temporary folder
-        for file in os.listdir(temp_folder):
-            os.remove(os.path.join(temp_folder, file))
-        os.rmdir(temp_folder)
 
         # Send the generated Excel file to the user
         return send_file(output_file, as_attachment=True)
