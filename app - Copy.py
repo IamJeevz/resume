@@ -11,10 +11,6 @@ app = Flask(__name__)
 UPLOAD_FOLDER = '/mnt/data/uploads'  # Render's persistent storage path
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
-# Check if the path is accessible
-print("Checking if the upload folder exists...")
-print("Uploads folder exists: ", os.path.exists(UPLOAD_FOLDER))
-
 # Function to extract email
 def extract_email(text):
     email_pattern = r'[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}'
@@ -96,11 +92,11 @@ def index():
         temp_folder = os.path.join(app.config['UPLOAD_FOLDER'], 'temp')
 
         # Ensure the directory exists
-        try:
-            if not os.path.exists(temp_folder):
+        if not os.path.exists(temp_folder):
+            try:
                 os.makedirs(temp_folder)
-        except PermissionError as e:
-            return f"PermissionError: {e} - Please check your permissions."
+            except PermissionError as e:
+                return f"PermissionError: {e} - Please check your permissions."
 
         # Process resumes and extract data
         resume_data = []
