@@ -29,6 +29,7 @@ app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 # Function to check name similarity
 def name_similarity(extracted_name, file_name):
     ratio = SequenceMatcher(None, extracted_name.lower(), file_name.lower()).ratio()
+    print(f"Similarity Ratio: {ratio:.2f}")
     return ratio
 
 # Function to extract email
