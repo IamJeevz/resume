@@ -20,30 +20,6 @@ country_to_nationality = {
     "United Arab Emirates": "Emirati", "UAE": "Emirati"
 }
 
-
-# Define a list of common job title keywords
-job_keywords = [
-    "Manager", "Engineer", "Developer", "Doctor", "Consultant", "Coordinator",
-    "Specialist", "Analyst", "Nurse", "Architect", "Technician", "Lead", "Director", "Executive", "Trainer", "Scientist",
-    "Assistant", "Supervisor", "Administrator", "Clerk", "Operator", "Officer", "Designer", "Trainer", "Technologist",
-    "Chef", "Sales", "Accountant", "Business Analyst", "Project Manager", "Program Manager", "Product Manager", "Legal Advisor",
-    "Social Worker", "Researcher", "Marketing", "HR", "Director", "Chief", "Chief Executive Officer", "CFO", "COO", "CTO",
-    "Software Engineer", "Web Developer", "Data Scientist", "System Analyst", "IT Manager", "Business Development", "Chief Marketing Officer",
-    "UX Designer", "Product Designer", "Data Analyst", "Business Development Manager", "Digital Marketing", "Account Executive",
-    "Financial Analyst", "Security Specialist", "HR Manager", "Operations Manager", "Quality Analyst", "Risk Manager", "IT Specialist",
-    "Sales Manager", "Customer Support", "Logistics Manager", "Project Coordinator", "Public Relations", "Copywriter", "Content Writer",
-    "Photographer", "Videographer", "Consulting Analyst", "Security Consultant", "Healthcare Consultant", "Marketing Consultant",
-    "SEO Specialist", "UX/UI Designer", "Event Coordinator", "Facilities Manager", "Office Manager", "Customer Service Representative",
-    "Research Analyst", "Teacher", "Instructor", "Professor", "Lecturer", "Academic Advisor", "Instructional Designer", "Counselor",
-    "Chief Information Officer", "Software Developer", "Field Engineer", "Maintenance Engineer", "Systems Administrator", "Network Engineer",
-    "Recruiter", "Event Planner", "Data Entry", "Technician", "Help Desk", "Support Engineer", "Financial Controller", "Health Educator",
-    "Project Director", "Creative Director", "Brand Manager", "Talent Manager", "Business Partner", "Product Specialist", "SEO Manager"
-]
-
-
-
-
-
 app = Flask(__name__)
 
 # Use a temporary directory for file uploads
@@ -51,9 +27,7 @@ UPLOAD_FOLDER = tempfile.mkdtemp()
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
 # Words to ignore in filename
-IGNORE_WORDS = {'resume', 'cv', 'curriculum', 'vitae', 'application', 'letter'}  # Add more as needed
-
-
+IGNORE_WORDS = {"resume", "cv", "profile"}
 
 def clean_filename(file_name):
     """
@@ -62,43 +36,35 @@ def clean_filename(file_name):
     """
     words = re.split(r'[\s\W_]+', file_name)  # Split by space, special characters, and underscores
     cleaned_words = [word for word in words if word.lower() not in IGNORE_WORDS and not word.isdigit()]
+    
     cleaned_name = " ".join(cleaned_words)  # Rejoin the words
-    return cleaned_name if len(cleaned_name) > 3 else None
+    return cleaned_name if len(cleaned_name) > 3 else None  # Return only if length > 3
 
 def name_similarity(extracted_name, file_name):
     """
-    Compares the extracted name with the filename based on multiple conditions.
-    If the similarity score is greater than 0.5, return extracted_name.
-    If filename contains extracted_name or vice versa, return extracted_name.
-    If the extracted name contains any numbers, return the file name.
-    If the file name appears in the entire file content, return the filename.
-    Otherwise, return "Not Found".
+    Checks the similarity between the extracted name and filename.
+    Implements logic for handling similarity scores and ignored words.
     """
-    if not extracted_name and not file_name:
-        return "Not Found"  # Return "Not Found" if both name and file name are missing
-
     file_name_base = os.path.splitext(file_name)[0]  # Remove file extension
     file_name_cleaned = clean_filename(file_name_base)  # Clean filename
 
-    # 1. If extracted_name contains any number, return file_name
-    if re.search(r'\d', extracted_name):  # If extracted_name contains a digit
-        return file_name_cleaned
+    if not extracted_name:  # If no name extracted, use cleaned filename if available
+        return file_name_cleaned if file_name_cleaned else "Unknown"
 
-    # 2. Compare extracted_name and file_name similarity score
     similarity_score = SequenceMatcher(None, extracted_name.lower(), file_name_base.lower()).ratio()
+
     if similarity_score > 0.5:
         return extracted_name
-
-    # 3. Check if file_name contains extracted_name or extracted_name contains file_name
-    if extracted_name.lower() in file_name_base.lower() or file_name_base.lower() in extracted_name.lower():
+    
+    # If similarity is low, check the cleaned file name logic
+    if file_name_cleaned:
+        return file_name_cleaned  # Use cleaned filename if valid
+    
+    # If filename is invalid, check if extracted name has numbers
+    if not re.search(r'\d', extracted_name):  # If extracted name has no numbers, keep it
         return extracted_name
-
-    # 4. Check if the entire file contains the file_name (use the cleaned version for comparison)
-    if file_name_cleaned and file_name_cleaned in extracted_name.lower():
-        return file_name_cleaned
-
-    # 5. If none of the above, return extracted_name (default behavior)
-    return extracted_name
+    
+    return "Unknown"  # If both fail, return "Unknown"
 
 # Function to extract email
 def extract_email(text):
@@ -110,11 +76,13 @@ def extract_email(text):
 def extract_phone(text):
     phone_pattern = r'\+?\d{1,3}[-.\s]?\d{1,4}[-.\s]?\d{2,4}[-.\s]?\d{2,4}[-.\s]?\d{2,4}'
     phone_matches = re.findall(phone_pattern, text)
+    
     if phone_matches:
         clean_phone = re.sub(r'\D', '', phone_matches[0])  # Remove non-digit characters
         if len(clean_phone) > 14:
             return "Not Found"
         return phone_matches[0]
+    
     return "Not Found"
 
 # Function to extract name (assuming it is in the first non-empty line)
@@ -140,22 +108,6 @@ def extract_nationality(text):
         return ", ".join(set(found_countries))
 
     return found_countries[0] if found_countries else "Not Found"
-
-def extract_designation_simple(text):
-    """
-    Extracts job titles/designations from the given text using predefined job-related keywords.
-    """
-    # Use regex to find occurrences of job keywords in the text
-    pattern = r'\b(?:' + '|'.join(job_keywords) + r')\b'
-    job_titles = re.findall(pattern, text, re.IGNORECASE)
-    
-    # Remove duplicates by converting to a set and back to a list
-    job_titles = list(set([title.capitalize() for title in job_titles]))
-    
-    # If no job title is found, return "Not Found"
-    if job_titles:
-        return ", ".join(job_titles)
-    return "Not Found"
 
 # Function to read PDF file
 def read_pdf(file_path):
@@ -187,13 +139,12 @@ def process_resume(file_path):
     email = extract_email(text)
     phone = extract_phone(text)
     nationality = extract_nationality(text)
-    designation = extract_designation_simple(text)  # Extract the designation/job title
 
     # Determine final name based on similarity logic
     final_name = name_similarity(extracted_name, file_name)
 
     # Return extracted data
-    return [(final_name, email, phone, nationality, designation)]
+    return [(final_name, email, phone, nationality)]
 
 # Function to create and save data into an Excel file
 def create_excel(data, output_file):
@@ -201,7 +152,7 @@ def create_excel(data, output_file):
     ws = wb.active
     ws.title = "Resume Data"
 
-    headers = ["Name", "Email", "Phone Number", "Nationality", "Designation"]
+    headers = ["Name", "Email", "Phone Number", "Nationality"]
     ws.append(headers)
     for row in data:
         ws.append(row)
@@ -235,4 +186,4 @@ def index():
 
 if __name__ == "__main__":
     port = os.getenv("PORT", 5000)  # Use Render's port or default to 5000
-    app.run(host="0.0.0.0", port=int(port), debug=True)  # Start the Flask app
+    app.run(host="0.0.0.0", port=int(port), debug=True)
