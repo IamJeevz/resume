@@ -29,6 +29,7 @@ app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 # Function to check name similarity
 def name_similarity(extracted_name, file_name):
     ratio = SequenceMatcher(None, extracted_name.lower(), file_name.lower()).ratio()
+    print(f"Similarity Ratio: {ratio:.2f}")
     return ratio
 
 # Function to extract email
@@ -37,11 +38,11 @@ def extract_email(text):
     email = re.findall(email_pattern, text)
     return email[0] if email else None
 
-# Function to extract phone number
 def extract_phone(text):
     phone_pattern = r'\+?\d{1,3}[-.\s]?\d{1,4}[-.\s]?\d{2,4}[-.\s]?\d{2,4}[-.\s]?\d{2,4}'
     phone = re.findall(phone_pattern, text)
     return phone[0] if phone else None
+
 
 # Function to extract name (assuming it is in the first non-empty line)
 def extract_name(text):
@@ -78,17 +79,9 @@ def read_docx(file_path):
     doc = docx.Document(file_path)
     return '\n'.join(para.text for para in doc.paragraphs)
 
-# Function to clean file name by removing common words like "cv", "resume", etc.
-def clean_file_name(file_name):
-    common_words = {"cv", "resume", "document", "profile", "bio", "details"}
-    words = re.split(r'\W+', file_name)  # Split by non-alphanumeric characters
-    cleaned_words = [word for word in words if word.lower() not in common_words]
-    return " ".join(cleaned_words)  # Join cleaned words back into a string
-
 # Function to process a single resume and extract data
 def process_resume(file_path):
-    raw_file_name = os.path.splitext(os.path.basename(file_path))[0]  # Remove extension
-    file_name = clean_file_name(raw_file_name)  # Clean the file name
+    file_name = os.path.splitext(os.path.basename(file_path))[0]  # Extract file name without extension
 
     # Read the file and extract text
     text = ''
@@ -101,23 +94,16 @@ def process_resume(file_path):
         return []
 
     # Extract details
-    extracted_name = extract_name(text)
+    name = extract_name(text)
     email = extract_email(text)
     phone = extract_phone(text)
     nationality = extract_nationality(text)
 
-    # Step 1: Check name similarity
-    if extracted_name and name_similarity(extracted_name, file_name) > 0.7:
-        final_name = extracted_name
-    else:
-        # Step 2: Check if the cleaned file name exists inside the resume text
-        if re.search(rf'\b{re.escape(file_name)}\b', text, re.IGNORECASE):
-            final_name = file_name
-        else:
-            final_name = extracted_name
+    # Check name similarity with file name
+    name_match = "Match" if name and name_similarity(name, file_name) > 0.7 else "Mismatch"
 
     # Return extracted data
-    return [(final_name, email, phone, nationality)]
+    return [(name, email, phone, nationality)]
 
 # Function to create and save data into an Excel file
 def create_excel(data, output_file):

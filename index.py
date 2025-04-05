@@ -70,7 +70,7 @@ def name_similarity(extracted_name, file_name):
 def extract_email(text):
     email_pattern = r'[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}'
     email = re.findall(email_pattern, text)
-    return email[0] if email else None
+    return email[0] if email else "Not Found"
 
 # Function to extract phone number
 def extract_phone(text):
@@ -83,7 +83,7 @@ def extract_phone(text):
             return "Not Found"
         return phone_matches[0]
     
-    return None
+    return "Not Found"
 
 # Function to extract name (assuming it is in the first non-empty line)
 def extract_name(text):
