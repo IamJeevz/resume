@@ -26,64 +26,22 @@ app = Flask(__name__)
 UPLOAD_FOLDER = tempfile.mkdtemp()
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
-# Words to ignore in filename
-IGNORE_WORDS = {"resume", "cv", "profile"}
-
-def clean_filename(file_name):
-    """
-    Removes ignored words and numbers from the filename.
-    Returns the cleaned name if it contains more than 3 letters.
-    """
-    words = re.split(r'[\s\W_]+', file_name)  # Split by space, special characters, and underscores
-    cleaned_words = [word for word in words if word.lower() not in IGNORE_WORDS and not word.isdigit()]
-    
-    cleaned_name = " ".join(cleaned_words)  # Rejoin the words
-    return cleaned_name if len(cleaned_name) > 3 else None  # Return only if length > 3
-
+# Function to check name similarity
 def name_similarity(extracted_name, file_name):
-    """
-    Checks the similarity between the extracted name and filename.
-    Implements logic for handling similarity scores and ignored words.
-    """
-    file_name_base = os.path.splitext(file_name)[0]  # Remove file extension
-    file_name_cleaned = clean_filename(file_name_base)  # Clean filename
-
-    if not extracted_name:  # If no name extracted, use cleaned filename if available
-        return file_name_cleaned if file_name_cleaned else "Unknown"
-
-    similarity_score = SequenceMatcher(None, extracted_name.lower(), file_name_base.lower()).ratio()
-
-    if similarity_score > 0.5:
-        return extracted_name
-    
-    # If similarity is low, check the cleaned file name logic
-    if file_name_cleaned:
-        return file_name_cleaned  # Use cleaned filename if valid
-    
-    # If filename is invalid, check if extracted name has numbers
-    if not re.search(r'\d', extracted_name):  # If extracted name has no numbers, keep it
-        return extracted_name
-    
-    return "Unknown"  # If both fail, return "Unknown"
+    ratio = SequenceMatcher(None, extracted_name.lower(), file_name.lower()).ratio()
+    return ratio
 
 # Function to extract email
 def extract_email(text):
     email_pattern = r'[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}'
     email = re.findall(email_pattern, text)
-    return email[0] if email else "Not Found"
+    return email[0] if email else None
 
 # Function to extract phone number
 def extract_phone(text):
     phone_pattern = r'\+?\d{1,3}[-.\s]?\d{1,4}[-.\s]?\d{2,4}[-.\s]?\d{2,4}[-.\s]?\d{2,4}'
-    phone_matches = re.findall(phone_pattern, text)
-    
-    if phone_matches:
-        clean_phone = re.sub(r'\D', '', phone_matches[0])  # Remove non-digit characters
-        if len(clean_phone) > 14:
-            return "Not Found"
-        return phone_matches[0]
-    
-    return "Not Found"
+    phone = re.findall(phone_pattern, text)
+    return phone[0] if phone else None
 
 # Function to extract name (assuming it is in the first non-empty line)
 def extract_name(text):
@@ -120,9 +78,17 @@ def read_docx(file_path):
     doc = docx.Document(file_path)
     return '\n'.join(para.text for para in doc.paragraphs)
 
+# Function to clean file name by removing common words like "cv", "resume", etc.
+def clean_file_name(file_name):
+    common_words = {"cv", "resume", "document", "profile", "bio", "details"}
+    words = re.split(r'\W+', file_name)  # Split by non-alphanumeric characters
+    cleaned_words = [word for word in words if word.lower() not in common_words]
+    return " ".join(cleaned_words)  # Join cleaned words back into a string
+
 # Function to process a single resume and extract data
 def process_resume(file_path):
-    file_name = os.path.basename(file_path)  # Get filename with extension
+    raw_file_name = os.path.splitext(os.path.basename(file_path))[0]  # Remove extension
+    file_name = clean_file_name(raw_file_name)  # Clean the file name
 
     # Read the file and extract text
     text = ''
@@ -140,8 +106,15 @@ def process_resume(file_path):
     phone = extract_phone(text)
     nationality = extract_nationality(text)
 
-    # Determine final name based on similarity logic
-    final_name = name_similarity(extracted_name, file_name)
+    # Step 1: Check name similarity
+    if extracted_name and name_similarity(extracted_name, file_name) > 0.7:
+        final_name = extracted_name
+    else:
+        # Step 2: Check if the cleaned file name exists inside the resume text
+        if re.search(rf'\b{re.escape(file_name)}\b', text, re.IGNORECASE):
+            final_name = file_name
+        else:
+            final_name = extracted_name
 
     # Return extracted data
     return [(final_name, email, phone, nationality)]
